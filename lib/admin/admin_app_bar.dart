@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:loan_management/admin_home.dart';
-import 'package:loan_management/add_staff.dart';
-import 'home.dart';
+import 'package:loan_management/admin/AllDebtorsPage.dart';
+import 'package:loan_management/admin/Debtor.dart';
+import 'package:loan_management/admin/admin_home.dart';
+import 'package:loan_management/admin/add_staff.dart';
+import 'package:loan_management/user/Debtor.dart';
 
 class AdminLayout extends StatefulWidget {
   final String username;
@@ -19,11 +21,8 @@ class _AdminLayoutState extends State<AdminLayout> {
   Future<void> _logout() async {
     await FirebaseAuth.instance.signOut();
     if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const HomePage()),
-        (route) => false,
-      );
+      // Assuming '/home' is your login or initial screen
+      Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
     }
   }
 
@@ -31,7 +30,7 @@ class _AdminLayoutState extends State<AdminLayout> {
     setState(() {
       _currentPage = page;
     });
-    Navigator.pop(context);
+    Navigator.pop(context); // Close the drawer
   }
 
   @override
@@ -127,6 +126,35 @@ class _AdminLayoutState extends State<AdminLayout> {
                   style: TextStyle(color: Colors.white)),
               onTap: () => _selectPage(const AddStaffPage()),
             ),
+
+            // ### NEW ITEMS ADDED HERE ###
+            const Divider(color: Colors.white24),
+
+            ListTile(
+              leading: const Icon(Icons.people, color: Colors.white),
+              title: const Text("All Debtor Data",
+                  style: TextStyle(color: Colors.white)),
+              onTap: () => _selectPage(const AllDebtorsPage()),
+            ),
+            ExpansionTile(
+              leading: const Icon(Icons.edit_document, color: Colors.white),
+              title: const Text("Debtor Update",
+                  style: TextStyle(color: Colors.white)),
+              iconColor: Colors.white,
+              collapsedIconColor: Colors.white,
+              children: [
+                ListTile(
+                  // Indent the sub-item for better UI
+                  contentPadding: const EdgeInsets.only(left: 30.0),
+                  leading:
+                      const Icon(Icons.person_search, color: Colors.white70),
+                  title: const Text("Update Details",
+                      style: TextStyle(color: Colors.white70)),
+                  onTap: () => _selectPage(const adminDebtorPage()),
+                ),
+              ],
+            ),
+            // ### END OF NEW ITEMS ###
           ],
         ),
       ),

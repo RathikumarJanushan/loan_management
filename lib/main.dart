@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart'; // generated file
-import 'appbar.dart';
-import 'home.dart';
+import 'package:loan_management/user/Debtor.dart';
+import 'auth_wrapper.dart'; // <-- Import the new wrapper
+import 'firebase_options.dart';
+import 'user/home.dart';
+import 'user/registration.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform, // required on web
+    options: DefaultFirebaseOptions.currentPlatform,
   );
   runApp(const MyApp());
 }
@@ -21,10 +23,15 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Loan Management',
       theme: ThemeData.dark(),
-      home: const Scaffold(
-        appBar: CustomAppBar(),
-        body: HomePage(),
-      ),
+      // The 'home' property tells the app which widget to load first.
+      // We use our AuthWrapper to decide where to go next.
+      home: const AuthWrapper(),
+      // We keep the named routes for easy navigation elsewhere in the app.
+      routes: {
+        '/home': (_) => const HomePage(),
+        '/register': (_) => const RegistrationPage(),
+        '/debtor': (context) => const DebtorPage(),
+      },
     );
   }
 }
