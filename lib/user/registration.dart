@@ -1,5 +1,10 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:loan_management/user/appbar.dart';
 import 'summary_register_page.dart';
 
@@ -12,6 +17,9 @@ class RegistrationPage extends StatefulWidget {
 
 class _RegistrationPageState extends State<RegistrationPage> {
   final _formKey = GlobalKey<FormState>();
+
+  // TODO: Replace with your actual Gemini API Key
+  static const String _apiKey = 'AIzaSyCzHKlSirU-oIk2mfHRxhUKjTty-e3qVwE';
 
   // controllers
   final _name = TextEditingController();
@@ -28,6 +36,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
   // selects
   String? _gender;
   DateTime? _loanDate;
+  bool _isExtracting = false; // To show loading state
 
   // palette
   static const _bg = Color(0xFF0B0220);
@@ -36,6 +45,74 @@ class _RegistrationPageState extends State<RegistrationPage> {
   static const _teal = Color(0xFF5FB2B2);
   static const _tealBright = Color(0xFF7FD0D0);
   static const _lavender = Color(0xFFB794F4);
+
+  // --- Gemini Extraction Logic ---
+  Future<void> _pickAndExtractIC() async {
+    final picker = ImagePicker();
+    try {
+      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+      if (image == null) return;
+
+      setState(() => _isExtracting = true);
+
+      // Read image bytes
+      final Uint8List imageBytes = await image.readAsBytes();
+
+      // Initialize Gemini Model
+      // Note: gemini-1.5-flash is faster and cheaper for this task
+      final model = GenerativeModel(
+        model: 'gemini-2.5-flash',
+        apiKey: _apiKey,
+      );
+
+      // Prompt engineering
+      final prompt = TextPart("Analyze this Malaysian IC (Identity Card). "
+          "Extract the Name, IC Number, and Address. "
+          "Return STRICTLY raw JSON format with keys: 'name', 'ic', 'address'. "
+          "Do not include markdown code blocks (like ```json). "
+          "If a field is not found, leave it empty string.");
+
+      final content = [
+        Content.multi([prompt, DataPart('image/jpeg', imageBytes)])
+      ];
+
+      final response = await model.generateContent(content);
+
+      if (response.text != null) {
+        // Clean up response just in case Gemini includes markdown
+        String rawJson = response.text!
+            .replaceAll('```json', '')
+            .replaceAll('```', '')
+            .trim();
+
+        final Map<String, dynamic> data = jsonDecode(rawJson);
+
+        setState(() {
+          _name.text = data['name'] ?? '';
+          _ic.text = data['ic'] ?? '';
+          _address.text = data['address'] ?? '';
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Details extracted successfully!'),
+              backgroundColor: _teal,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error extracting ID: $e')),
+        );
+      }
+    } finally {
+      setState(() => _isExtracting = false);
+    }
+  }
+  // -------------------------------
 
   InputDecoration _inputDec(String hint, {IconData? icon}) => InputDecoration(
         hintText: hint,
@@ -108,6 +185,58 @@ class _RegistrationPageState extends State<RegistrationPage> {
           ),
         ),
       );
+
+  // New Widget for the Upload Button
+  Widget _uploadButton() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          // Align with label width
+          const SizedBox(width: 244),
+          Expanded(
+            child: InkWell(
+              onTap: _isExtracting ? null : _pickAndExtractIC,
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white10,
+                  borderRadius: BorderRadius.circular(16),
+                  border:
+                      Border.all(color: _tealBright.withOpacity(0.5), width: 1),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (_isExtracting)
+                      const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: _tealBright),
+                      )
+                    else ...[
+                      const Icon(Icons.document_scanner, color: _tealBright),
+                      const SizedBox(width: 10),
+                      const Text(
+                        "Upload IC to Auto-fill",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ]
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _textRow({
     required String label,
@@ -219,7 +348,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
                 child: Row(
                   children: [
                     const SizedBox(width: 4),
-                    Icon(Icons.calendar_today, size: 18, color: Colors.black54),
+                    const Icon(Icons.calendar_today,
+                        size: 18, color: Colors.black54),
                     const SizedBox(width: 8),
                     Text(
                       text,
@@ -358,6 +488,10 @@ class _RegistrationPageState extends State<RegistrationPage> {
                   // sections
                   _sectionTitle('Applicant details', Icons.badge),
                   const SizedBox(height: 8),
+
+                  // --- ADDED UPLOAD BUTTON HERE ---
+                  _uploadButton(),
+                  // --------------------------------
 
                   _textRow(label: 'Name', c: _name, icon: Icons.person_outline),
                   _genderRow(),

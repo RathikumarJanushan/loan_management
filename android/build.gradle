@@ -12,6 +12,14 @@ subprojects {
 subprojects {
     project.evaluationDependsOn(":app")
 }
+// Force all plugins to use a stable version of androidx.activity
+subprojects {
+    project.configurations.all {
+        resolutionStrategy {
+            force 'androidx.activity:activity:1.9.3'
+        }
+    }
+}
 
 tasks.register("clean", Delete) {
     delete rootProject.buildDir

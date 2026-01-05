@@ -1,11 +1,9 @@
 import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:loan_management/user/appbar.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-
 import 'package:fl_chart/fl_chart.dart';
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
@@ -345,23 +343,11 @@ class _adminDebtorPageState extends State<adminDebtorPage> {
                 style: const TextStyle(color: Colors.white)))
       ]));
 
-  Future<void> _printInstallmentReport({
-    required Map<String, dynamic> loanData,
-    required Map<String, dynamic>? paymentData,
-    required DateTime dueDate,
-    required int installmentNumber,
-  }) async {
-    // ... This function remains unchanged ...
-  }
-
-  // (The rest of the file is updated below)
-
   DataTable _scheduleTable({
     required DateTime loanDate,
     required int months,
     required List<DocumentSnapshot<Map<String, dynamic>>> payments,
   }) {
-    // ... This function remains unchanged ...
     final rows = List.generate(months, (i) {
       final due =
           DateTime(loanDate.year, loanDate.month + (i + 1), loanDate.day);
@@ -424,6 +410,7 @@ class _adminDebtorPageState extends State<adminDebtorPage> {
             icon: const Icon(Icons.print_outlined, color: Colors.white70),
             onPressed: () {
               if (_doc?.data() != null) {
+                // This now calls the fully implemented function below
                 _printInstallmentReport(
                   loanData: _doc!.data()!,
                   paymentData: paymentData,
@@ -466,7 +453,7 @@ class _adminDebtorPageState extends State<adminDebtorPage> {
                   Text('Make Payment', style: TextStyle(color: Colors.white))),
           DataColumn(
               label:
-                  Text('Print Report', style: TextStyle(color: Colors.white))),
+                  Text('Print receipt', style: TextStyle(color: Colors.white))),
         ],
         rows: rows,
         columnSpacing: 28,
@@ -476,7 +463,6 @@ class _adminDebtorPageState extends State<adminDebtorPage> {
   }
 
   Widget _buildChartLegend() {
-    // ... This function remains unchanged ...
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -488,7 +474,6 @@ class _adminDebtorPageState extends State<adminDebtorPage> {
   }
 
   Widget _legendItem(Color color, String text) {
-    // ... This function remains unchanged ...
     return Row(
       children: [
         Container(width: 12, height: 12, color: color),
@@ -499,7 +484,6 @@ class _adminDebtorPageState extends State<adminDebtorPage> {
   }
 
   Widget _buildPaymentsChart() {
-    // ... This function remains unchanged ...
     if (_payments.isEmpty) return const SizedBox.shrink();
     const interestColor = Color(0xff50e4d4);
     const principalColor = Color(0xff27b6d9);
@@ -613,7 +597,115 @@ class _adminDebtorPageState extends State<adminDebtorPage> {
     );
   }
 
-  // ############## NEW PDF REPORTING LOGIC ##############
+  // ############## PDF REPORTING LOGIC ##############
+
+  // ### 1. Prints a report for a SINGLE installment ###
+  Future<void> _printInstallmentReport({
+    required Map<String, dynamic> loanData,
+    required Map<String, dynamic>? paymentData,
+    required DateTime dueDate,
+    required int installmentNumber,
+  }) async {
+    final doc = pw.Document();
+    final calcData = loanData['calc'] as Map<String, dynamic>? ?? {};
+
+    String formatValue(dynamic value) {
+      if (value is num) return value.toStringAsFixed(2);
+      return value?.toString() ?? 'N/A';
+    }
+
+    doc.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Header(
+                level: 0,
+                child: pw.Text('Payment Installment Report',
+                    style: pw.TextStyle(
+                        fontSize: 24, fontWeight: pw.FontWeight.bold)),
+              ),
+              pw.Header(level: 2, text: 'Debtor and Loan Details'),
+              pw.Table.fromTextArray(
+                border: null,
+                cellAlignment: pw.Alignment.centerLeft,
+                headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                cellStyle: const pw.TextStyle(fontSize: 10),
+                columnWidths: {
+                  0: const pw.FlexColumnWidth(1),
+                  1: const pw.FlexColumnWidth(2),
+                },
+                data: <List<String>>[
+                  <String>['Name', formatValue(loanData['name'])],
+                  <String>['IC No.', formatValue(loanData['icNo'])],
+                  <String>['Loan Amount', formatValue(loanData['loanAmount'])],
+                  <String>[
+                    'Total Payment',
+                    formatValue(calcData['totalPayment'])
+                  ],
+                  <String>[
+                    'Monthly Payment',
+                    formatValue(calcData['monthlyPayment'])
+                  ],
+                ],
+              ),
+              pw.Divider(height: 20),
+              pw.Header(
+                level: 2,
+                text: 'Installment #$installmentNumber Details',
+              ),
+              pw.Table.fromTextArray(
+                border: pw.TableBorder.all(),
+                cellAlignment: pw.Alignment.centerLeft,
+                headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                data: <List<String>>[
+                  <String>['Field', 'Value'],
+                  <String>['Due Date', _fmtDate(dueDate)],
+                  <String>['Status', paymentData != null ? 'Paid' : 'Pending'],
+                  <String>[
+                    'Date of Payment',
+                    paymentData?['paymentDate'] != null
+                        ? _fmtDate(_asDate(paymentData!['paymentDate'])!)
+                        : 'N/A'
+                  ],
+                  <String>[
+                    'Amount Paid',
+                    formatValue(paymentData?['amountPaid'])
+                  ],
+                  <String>['Interest', formatValue(paymentData?['interest'])],
+                  <String>['Principal', formatValue(paymentData?['principal'])],
+                  <String>[
+                    'Loan Balance',
+                    formatValue(paymentData?['loanBalance'])
+                  ],
+                  <String>[
+                    'Large Loan Balance',
+                    formatValue(paymentData?['largeLoanBalance'])
+                  ],
+                  <String>[
+                    'Pending Interest',
+                    formatValue(paymentData?['pendingInterest'])
+                  ],
+                ],
+              ),
+              pw.Spacer(),
+              pw.Footer(
+                title:
+                    pw.Text('Report generated on ${_fmtDate(DateTime.now())}'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => doc.save());
+  }
+
+  // ### 2. Prints a report for the ENTIRE loan ###
   Future<void> _printFullReport() async {
     if (_doc == null) return;
     final doc = await _generateFullReportPdf();
@@ -626,7 +718,6 @@ class _adminDebtorPageState extends State<adminDebtorPage> {
     final loanData = _doc!.data()!;
     final calcData = loanData['calc'] as Map<String, dynamic>? ?? {};
 
-    // Calculate totals
     double totalAmountPaid = 0;
     double totalPrincipalPaid = 0;
     double totalInterestPaid = 0;
@@ -642,7 +733,6 @@ class _adminDebtorPageState extends State<adminDebtorPage> {
       remainingBalance = (data['loanBalance'] as num?)?.toDouble() ?? 0;
     }
 
-    // Helpers for PDF
     String formatValue(dynamic value) {
       if (value is num) return value.toStringAsFixed(2);
       return value?.toString() ?? 'N/A';
@@ -744,7 +834,7 @@ class _adminDebtorPageState extends State<adminDebtorPage> {
     );
     return doc;
   }
-  // ############## END OF NEW PDF LOGIC ##############
+  // ############## END OF PDF LOGIC ##############
 
   @override
   Widget build(BuildContext context) {
@@ -848,7 +938,6 @@ class _adminDebtorPageState extends State<adminDebtorPage> {
                 const Text('No record loaded.',
                     style: TextStyle(color: Colors.white60))
               else if (data != null) ...[
-                // ############## NEW PRINT BUTTON ##############
                 Align(
                   alignment: Alignment.centerRight,
                   child: ElevatedButton.icon(
@@ -865,7 +954,6 @@ class _adminDebtorPageState extends State<adminDebtorPage> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                // ############## END OF NEW BUTTON ##############
                 Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
