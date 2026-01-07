@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:loan_management/user/appbar.dart';
+import 'doc_upload.dart'; // Import the new upload page
 
+// ... [Keep RegistrationData class unchanged] ...
 class RegistrationData {
   final String name;
   final String gender;
@@ -15,6 +17,7 @@ class RegistrationData {
   final String interestRatePct;
   final String paymentPeriod;
   final String nation;
+  final String status;
 
   RegistrationData({
     required this.name,
@@ -29,6 +32,7 @@ class RegistrationData {
     required this.interestRatePct,
     required this.paymentPeriod,
     required this.nation,
+    this.status = 'pending',
   });
 }
 
@@ -43,18 +47,32 @@ class SummaryRegisterPage extends StatefulWidget {
 class _SummaryRegisterPageState extends State<SummaryRegisterPage> {
   bool _saving = false;
 
-  // palette
+  // Palette
   static const _bg = Color(0xFF0B0220);
   static const _card = Color(0xFF120834);
   static const _teal = Color(0xFF5FB2B2);
   static const _tealBright = Color(0xFF7FD0D0);
   static const _lavender = Color(0xFFB794F4);
 
+  // ... [Keep _line, _numParse, _rm, _metricTile helpers unchanged] ...
   Widget _line(String k, String v) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Text(
-          '$k: $v',
-          style: const TextStyle(fontSize: 18, color: Colors.white),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 160,
+              child: Text('$k:',
+                  style: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.white70,
+                      fontWeight: FontWeight.bold)),
+            ),
+            Expanded(
+              child: Text(v,
+                  style: const TextStyle(fontSize: 16, color: Colors.white)),
+            ),
+          ],
         ),
       );
 
@@ -66,65 +84,9 @@ class _SummaryRegisterPageState extends State<SummaryRegisterPage> {
 
   String _rm(num x) => 'RM ${x.toStringAsFixed(2)}';
 
-  Future<void> _save() async {
-    if (_saving) return;
-    setState(() => _saving = true);
-
-    final d = widget.data;
-
-    final loan = _numParse(d.loanAmount);
-    final ratePct = _numParse(d.interestRatePct);
-    final periodNum = _numParse(d.paymentPeriod);
-    final periodInt = periodNum.isFinite ? periodNum.round() : 0;
-
-    final totalInterest = loan * (ratePct / 100.0) * periodInt;
-    final totalPayment = loan + totalInterest;
-    final monthlyPayment = periodInt > 0 ? totalPayment / periodInt : 0;
-    final monthlyBenefit = periodInt > 0 ? totalInterest / periodInt : 0;
-
-    final payload = {
-      'name': d.name,
-      'gender': d.gender,
-      'icNo': d.icNo,
-      'address': d.address,
-      'phone': d.phone,
-      'work': d.work,
-      'incomeAmount': _numParse(d.incomeAmount),
-      'loanAmount': loan,
-      'loanDate': Timestamp.fromDate(d.loanDate),
-      'interestRatePct': ratePct,
-      'paymentPeriod': periodInt, // months
-      'nation': d.nation,
-      'calc': {
-        'totalInterest': totalInterest,
-        'totalPayment': totalPayment,
-        'monthlyPayment': monthlyPayment,
-        'monthlyBenefit': monthlyBenefit,
-      },
-      'createdAt': FieldValue.serverTimestamp(),
-    };
-
-    try {
-      final ref = await FirebaseFirestore.instance
-          .collection('userloneregister')
-          .add(payload);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Registered. ID: ${ref.id}')),
-      );
-      Navigator.pop(context);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Save failed: $e')),
-      );
-      setState(() => _saving = false);
-    }
-  }
-
   Widget _metricTile(String title, String value, IconData icon) {
     return Container(
-      width: 360,
+      width: 320,
       padding: const EdgeInsets.all(16),
       margin: const EdgeInsets.only(right: 14, bottom: 14),
       decoration: BoxDecoration(
@@ -165,17 +127,122 @@ class _SummaryRegisterPageState extends State<SummaryRegisterPage> {
     );
   }
 
+  // ▼▼▼ UPDATED SAVE LOGIC ▼▼▼
+  Future<void> _save() async {
+    if (_saving) return;
+    setState(() => _saving = true);
+
+    final d = widget.data;
+    final loan = _numParse(d.loanAmount);
+    final ratePct = _numParse(d.interestRatePct);
+    final periodNum = _numParse(d.paymentPeriod);
+    final periodInt = periodNum.isFinite ? periodNum.round() : 0;
+    final totalInterest = loan * (ratePct / 100.0) * periodInt;
+    final totalPayment = loan + totalInterest;
+    final monthlyPayment = periodInt > 0 ? totalPayment / periodInt : 0;
+    final monthlyBenefit = periodInt > 0 ? totalInterest / periodInt : 0;
+
+    final payload = {
+      'name': d.name,
+      'gender': d.gender,
+      'icNo': d.icNo,
+      'address': d.address,
+      'phone': d.phone,
+      'work': d.work,
+      'incomeAmount': _numParse(d.incomeAmount),
+      'loanAmount': loan,
+      'loanDate': Timestamp.fromDate(d.loanDate),
+      'interestRatePct': ratePct,
+      'paymentPeriod': periodInt,
+      'nation': d.nation,
+      'status': d.status,
+      'calc': {
+        'totalInterest': totalInterest,
+        'totalPayment': totalPayment,
+        'monthlyPayment': monthlyPayment,
+        'monthlyBenefit': monthlyBenefit,
+      },
+      'createdAt': FieldValue.serverTimestamp(),
+    };
+
+    try {
+      // 1. Save to Firestore
+      final ref = await FirebaseFirestore.instance
+          .collection('userloneregister')
+          .add(payload);
+
+      if (!mounted) return;
+
+      // 2. Show Success Dialog with Options
+      await showDialog(
+        context: context,
+        barrierDismissible: false, // User must choose an option
+        builder: (dialogContext) {
+          return AlertDialog(
+            backgroundColor: const Color(0xFF1A113B),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(color: Colors.white.withOpacity(0.1))),
+            title: const Text('Registration Successful',
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold)),
+            content: const Text(
+              'The debtor has been registered.\nDo you want to upload supporting documents (ID, Bank Statements, etc.) now?',
+              style: TextStyle(color: Colors.white70),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  // Not Now: Go Home
+                  Navigator.of(dialogContext).pop(); // Close dialog
+                  Navigator.of(context).pushNamedAndRemoveUntil(
+                      '/home', (route) => false); // Go home
+                },
+                child: const Text('Not Now',
+                    style: TextStyle(color: Colors.white54)),
+              ),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _tealBright,
+                  foregroundColor: const Color(0xFF0B0220),
+                ),
+                icon: const Icon(Icons.upload_file),
+                label: const Text('Upload Now'),
+                onPressed: () {
+                  Navigator.of(dialogContext).pop(); // Close dialog
+                  // Navigate to DocUploadPage with the new ID
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => DocUploadPage(debtorId: ref.id),
+                    ),
+                  );
+                },
+              ),
+            ],
+          );
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Save failed: $e'), backgroundColor: Colors.red),
+      );
+      setState(() => _saving = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    // ... [Keep build method identical to previous version] ...
+    // Just ensure the _save function call is correct in the button
     final d = widget.data;
     final dateStr =
         '${d.loanDate.year}-${d.loanDate.month.toString().padLeft(2, '0')}-${d.loanDate.day.toString().padLeft(2, '0')}';
-
     final loan = _numParse(d.loanAmount);
     final ratePct = _numParse(d.interestRatePct);
     final period = _numParse(d.paymentPeriod);
     final p = period.round();
-
     final totalInterest = loan * (ratePct / 100.0) * p;
     final totalPayment = loan + totalInterest;
     final monthlyPayment = p > 0 ? totalPayment / p : 0;
@@ -185,176 +252,173 @@ class _SummaryRegisterPageState extends State<SummaryRegisterPage> {
       backgroundColor: _bg,
       appBar: const CustomAppBar(),
       body: Center(
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 1100),
-          margin: const EdgeInsets.all(20),
-          // outer gradient border
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(26),
-            gradient: const LinearGradient(
-              colors: [Color(0x3312E6FF), Color(0x33B794F4)],
-            ),
-          ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(vertical: 20),
           child: Container(
-            padding: const EdgeInsets.all(22),
+            constraints: const BoxConstraints(maxWidth: 1100),
+            margin: const EdgeInsets.symmetric(horizontal: 20),
             decoration: BoxDecoration(
-              color: _card,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: Colors.white10),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.45),
-                  blurRadius: 30,
-                  offset: const Offset(0, 18),
-                ),
-              ],
+              borderRadius: BorderRadius.circular(26),
+              gradient: const LinearGradient(
+                colors: [Color(0x3312E6FF), Color(0x33B794F4)],
+              ),
             ),
-            child: ListView(
-              children: [
-                // header
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(10),
-                        gradient: const LinearGradient(
-                            colors: [_tealBright, _lavender]),
-                      ),
-                      child: Row(
-                        children: const [
-                          Icon(Icons.receipt_long,
-                              size: 18, color: Colors.black87),
-                          SizedBox(width: 6),
-                          Text(
-                            'Summary • Registration',
-                            style: TextStyle(
-                              color: Colors.black87,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Spacer(),
-                    const Icon(Icons.verified, color: Colors.white24),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // plain lines section (as requested earlier)
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.02),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white10),
+            child: Container(
+              padding: const EdgeInsets.all(22),
+              decoration: BoxDecoration(
+                color: _card,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.white10),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.45),
+                    blurRadius: 30,
+                    offset: const Offset(0, 18),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header
+                  Row(
                     children: [
-                      _line('Name', d.name),
-                      _line('Gender', d.gender),
-                      _line('Ic No', d.icNo),
-                      _line('Address', d.address),
-                      _line('Phone number', d.phone),
-                      _line('Work', d.work),
-                      _line('Income Amount', d.incomeAmount),
-                      _line('Loan amount', d.loanAmount),
-                      _line('Loan date', dateStr),
-                      _line('Interest Rate (%)', d.interestRatePct),
-                      _line('Payment Period', d.paymentPeriod),
-                      _line('Nation', d.nation),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 18),
-                const Divider(color: Colors.white12, height: 1),
-                const SizedBox(height: 18),
-
-                // calculated tiles
-                Wrap(
-                  spacing: 0,
-                  runSpacing: 0,
-                  children: [
-                    _metricTile(
-                      'Total interest',
-                      _rm(totalInterest),
-                      Icons.trending_up,
-                    ),
-                    _metricTile(
-                      'Total payment',
-                      _rm(totalPayment),
-                      Icons.payments_outlined,
-                    ),
-                    _metricTile(
-                      'MONTHLY PAYMENT',
-                      _rm(monthlyPayment),
-                      Icons.calendar_month,
-                    ),
-                    _metricTile(
-                      'MONTHLY BENEFIT (RM)',
-                      _rm(monthlyBenefit),
-                      Icons.ssid_chart_outlined,
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 10),
-
-                // info bar
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white10,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white12),
-                  ),
-                  child: Row(
-                    children: const [
-                      Icon(Icons.info_outline, color: Colors.white54, size: 18),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Confirm to save this registration. A random document ID will be created in Firestore at collection "userloneregister".',
-                          style: TextStyle(color: Colors.white70, fontSize: 13),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          gradient: const LinearGradient(
+                              colors: [_tealBright, _lavender]),
+                        ),
+                        child: Row(
+                          children: const [
+                            Icon(Icons.receipt_long,
+                                size: 18, color: Colors.black87),
+                            SizedBox(width: 6),
+                            Text(
+                              'Summary • Registration',
+                              style: TextStyle(
+                                color: Colors.black87,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
+                      const Spacer(),
+                      const Icon(Icons.verified, color: Colors.white24),
                     ],
                   ),
-                ),
-
-                const SizedBox(height: 18),
-
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: ElevatedButton.icon(
-                    onPressed: _saving ? null : _save,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _bg,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                        side: const BorderSide(color: Colors.white24),
+                  const SizedBox(height: 20),
+                  // Data List
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.02),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white10),
+                    ),
+                    child: Column(
+                      children: [
+                        _line('Name', d.name),
+                        _line('Gender', d.gender),
+                        _line('IC No', d.icNo),
+                        _line('Address', d.address),
+                        _line('Phone Number', d.phone),
+                        _line('Work', d.work),
+                        _line('Income Amount', d.incomeAmount),
+                        _line('Loan Amount', d.loanAmount),
+                        _line('Loan Date', dateStr),
+                        _line('Interest Rate (%)', d.interestRatePct),
+                        _line('Payment Period', d.paymentPeriod),
+                        _line('Nation', d.nation),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(
+                                width: 160,
+                                child: Text('Status:',
+                                    style: TextStyle(
+                                        fontSize: 16,
+                                        color: Colors.white70,
+                                        fontWeight: FontWeight.bold)),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(
+                                      color: Colors.amber.withOpacity(0.5)),
+                                ),
+                                child: Text(d.status.toUpperCase(),
+                                    style: const TextStyle(
+                                        color: Colors.amber,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  const Divider(color: Colors.white12, height: 1),
+                  const SizedBox(height: 18),
+                  // Metrics
+                  Wrap(
+                    spacing: 0,
+                    runSpacing: 0,
+                    children: [
+                      _metricTile('Total Interest', _rm(totalInterest),
+                          Icons.trending_up),
+                      _metricTile('Total Payment', _rm(totalPayment),
+                          Icons.payments_outlined),
+                      _metricTile('MONTHLY PAYMENT', _rm(monthlyPayment),
+                          Icons.calendar_month),
+                      _metricTile('MONTHLY BENEFIT (RM)', _rm(monthlyBenefit),
+                          Icons.ssid_chart_outlined),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  // Save Button
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: ElevatedButton.icon(
+                      onPressed: _saving ? null : _save,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _bg,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 32, vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                          side: const BorderSide(color: Colors.white24),
+                        ),
+                      ),
+                      icon: _saving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.check_circle_outline),
+                      label: Text(
+                        _saving ? 'Saving...' : 'Confirm & Register',
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                     ),
-                    icon: _saving
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.check_circle_outline),
-                    label: Text(_saving ? 'Saving...' : 'Confirm & Register'),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

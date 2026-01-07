@@ -5,6 +5,7 @@ import 'package:loan_management/admin/Debtor.dart';
 import 'package:loan_management/admin/admin_home.dart';
 import 'package:loan_management/admin/add_staff.dart';
 import 'package:loan_management/user/Debtor.dart';
+import 'package:loan_management/admin/access_give.dart'; // <--- 1. Import this
 
 class AdminLayout extends StatefulWidget {
   final String username;
@@ -16,12 +17,11 @@ class AdminLayout extends StatefulWidget {
 }
 
 class _AdminLayoutState extends State<AdminLayout> {
-  Widget _currentPage = const AdminHomePage(); // default
+  Widget _currentPage = const AdminHomePage();
 
   Future<void> _logout() async {
     await FirebaseAuth.instance.signOut();
     if (mounted) {
-      // Assuming '/home' is your login or initial screen
       Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
     }
   }
@@ -30,7 +30,7 @@ class _AdminLayoutState extends State<AdminLayout> {
     setState(() {
       _currentPage = page;
     });
-    Navigator.pop(context); // Close the drawer
+    Navigator.pop(context);
   }
 
   @override
@@ -38,7 +38,7 @@ class _AdminLayoutState extends State<AdminLayout> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E3A8A), // navy blue
+        backgroundColor: const Color(0xFF1E3A8A),
         elevation: 2,
         leading: Builder(
           builder: (context) => IconButton(
@@ -60,12 +60,20 @@ class _AdminLayoutState extends State<AdminLayout> {
               PopupMenuItem<String>(
                 value: "role",
                 enabled: false,
-                child: Text("Role: ${widget.role}"),
+                child: Text(
+                  "Role: ${widget.role}",
+                  style:
+                      const TextStyle(color: Colors.black), // Added style here
+                ),
               ),
               const PopupMenuDivider(),
               const PopupMenuItem<String>(
                 value: "logout",
-                child: Text("Logout"),
+                child: Text(
+                  "Logout",
+                  style:
+                      const TextStyle(color: Colors.black), // Added style here
+                ),
               ),
             ],
             child: Row(
@@ -92,7 +100,7 @@ class _AdminLayoutState extends State<AdminLayout> {
         ],
       ),
       drawer: Drawer(
-        backgroundColor: const Color(0xFF1E293B), // dark slate
+        backgroundColor: const Color(0xFF1E293B),
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
@@ -127,7 +135,15 @@ class _AdminLayoutState extends State<AdminLayout> {
               onTap: () => _selectPage(const AddStaffPage()),
             ),
 
-            // ### NEW ITEMS ADDED HERE ###
+            // ▼▼▼ NEW BUTTON HERE ▼▼▼
+            ListTile(
+              leading: const Icon(Icons.verified_user, color: Colors.white),
+              title: const Text("Access Give",
+                  style: TextStyle(color: Colors.white)),
+              onTap: () => _selectPage(const AccessGivePage()),
+            ),
+            // ▲▲▲ NEW BUTTON HERE ▲▲▲
+
             const Divider(color: Colors.white24),
 
             ListTile(
@@ -144,7 +160,6 @@ class _AdminLayoutState extends State<AdminLayout> {
               collapsedIconColor: Colors.white,
               children: [
                 ListTile(
-                  // Indent the sub-item for better UI
                   contentPadding: const EdgeInsets.only(left: 30.0),
                   leading:
                       const Icon(Icons.person_search, color: Colors.white70),
@@ -154,7 +169,6 @@ class _AdminLayoutState extends State<AdminLayout> {
                 ),
               ],
             ),
-            // ### END OF NEW ITEMS ###
           ],
         ),
       ),

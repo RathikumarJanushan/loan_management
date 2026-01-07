@@ -38,32 +38,143 @@ class _DebtorPageState extends State<DebtorPage> {
         ),
       );
 
+  // ▼▼▼ UPDATED SEARCH LOGIC ▼▼▼
   Future<void> _search() async {
     final ic = _ic.text.trim();
     if (ic.isEmpty) return;
+
+    // Clear previous data
     setState(() {
       _loading = true;
       _doc = null;
       _payments = [];
     });
-    final qs = await FirebaseFirestore.instance
-        .collection('userloneregister')
-        .where('icNo', isEqualTo: ic)
-        .limit(1)
-        .get();
 
-    if (qs.docs.isNotEmpty) {
-      _doc = qs.docs.first;
-      if (_name.text.trim().isEmpty) {
-        _name.text = _doc!.data()?['name'] ?? '';
+    try {
+      // 1. Get ALL documents with this IC (Removed limit(1))
+      final qs = await FirebaseFirestore.instance
+          .collection('userloneregister')
+          .where('icNo', isEqualTo: ic)
+          .get();
+
+      if (qs.docs.isEmpty) {
+        // No records found
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('No records found for this IC.')));
+        }
+      } else if (qs.docs.length == 1) {
+        // Single result: Validate status immediately
+        _validateAndLoadDoc(qs.docs.first);
+      } else {
+        // Multiple results: Show selection dialog
+        if (mounted) {
+          await _showLoanSelectionDialog(qs.docs);
+        }
       }
-      await _fetchPayments();
+    } catch (e) {
+      debugPrint("Search error: $e");
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
     }
-
-    setState(() {
-      _loading = false;
-    });
   }
+
+  // New Helper: Shows dialog to pick specific loan
+  Future<void> _showLoanSelectionDialog(
+      List<QueryDocumentSnapshot<Map<String, dynamic>>> docs) async {
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1A113B),
+          title:
+              const Text("Select Loan", style: TextStyle(color: Colors.white)),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.separated(
+              shrinkWrap: true,
+              itemCount: docs.length,
+              separatorBuilder: (c, i) => const Divider(color: Colors.white24),
+              itemBuilder: (context, index) {
+                final data = docs[index].data();
+                return ListTile(
+                  title: Text(
+                    "IC: ${data['icNo']}",
+                    style: const TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(
+                    "Loan Amount: RM ${data['loanAmount']}",
+                    style: const TextStyle(color: Colors.white70),
+                  ),
+                  trailing: const Icon(Icons.arrow_forward_ios,
+                      size: 16, color: Colors.white54),
+                  onTap: () {
+                    Navigator.pop(context); // Close dialog
+                    _validateAndLoadDoc(docs[index]); // Process selection
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child:
+                  const Text("Cancel", style: TextStyle(color: Colors.white54)),
+            )
+          ],
+        );
+      },
+    );
+  }
+
+  // New Helper: Checks status and loads data or shows alert
+  void _validateAndLoadDoc(DocumentSnapshot<Map<String, dynamic>> doc) async {
+    final data = doc.data();
+    if (data == null) return;
+
+    // Normalize status check (handle 'Approve', 'approve', 'approved', etc.)
+    final status = (data['status'] ?? 'pending').toString().toLowerCase();
+
+    if (status.contains('approve')) {
+      // APPROVED: Load Data
+      setState(() {
+        _doc = doc;
+        if (_name.text.trim().isEmpty) {
+          _name.text = data['name'] ?? '';
+        }
+      });
+      await _fetchPayments();
+    } else {
+      // PENDING or REJECTED: Show Alert
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF1A113B),
+            title: const Text("Access Denied",
+                style: TextStyle(color: Colors.redAccent)),
+            content: const Text(
+              "Waiting for approve.", // Exact text requested
+              style: TextStyle(color: Colors.white),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text("OK", style: TextStyle(color: Colors.white)),
+              )
+            ],
+          ),
+        );
+      }
+    }
+  }
+  // ▲▲▲ END UPDATED SEARCH LOGIC ▲▲▲
 
   Future<void> _fetchPayments() async {
     if (_doc == null) return;
@@ -348,6 +459,8 @@ class _DebtorPageState extends State<DebtorPage> {
     required int months,
     required List<DocumentSnapshot<Map<String, dynamic>>> payments,
   }) {
+    // [Image of Amortization Table]
+
     final rows = List.generate(months, (i) {
       final due =
           DateTime(loanDate.year, loanDate.month + (i + 1), loanDate.day);

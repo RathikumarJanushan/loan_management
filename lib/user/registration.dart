@@ -19,7 +19,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
   final _formKey = GlobalKey<FormState>();
 
   // TODO: Replace with your actual Gemini API Key
-  static const String _apiKey = 'AIzaSyCzHKlSirU-oIk2mfHRxhUKjTty-e3qVwE';
+  static const String _apiKey = 'AIzaSyBqOz61PLMxLEIgt8YIuUGYzwVx7CWNQBo';
 
   // controllers
   final _name = TextEditingController();
@@ -396,6 +396,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
       interestRatePct: _interest.text.trim(),
       paymentPeriod: _paymentPeriod.text.trim(),
       nation: _nation.text.trim(),
+      status: 'pending',
     );
 
     Navigator.push(

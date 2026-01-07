@@ -2,8 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:loan_management/user/Debtor.dart'; // Ensure this path is correct
-import '../login_dialog.dart'; // Ensure this path is correct
+import '../login_dialog.dart'; // Keep this for Staff Login only
 
 class CustomAppBar extends StatefulWidget implements PreferredSizeWidget {
   const CustomAppBar({super.key});
@@ -63,15 +62,13 @@ class _CustomAppBarState extends State<CustomAppBar> {
     }
   }
 
-  // ▼▼▼ UPDATED METHOD ▼▼▼
-  // Now accepts an optional 'redirectTo' parameter to pass to the LoginDialog.
+  // This opens the Pop-up Dialog (For Staff Only)
   Future<void> _openLogin({String? redirectTo}) async {
     await showDialog<void>(
       context: context,
       builder: (context) => LoginDialog(onLoginSuccessRedirectTo: redirectTo),
     );
   }
-  // ▲▲▲ UPDATED METHOD ▲▲▲
 
   Future<void> _logout() async {
     await FirebaseAuth.instance.signOut();
@@ -90,53 +87,54 @@ class _CustomAppBarState extends State<CustomAppBar> {
         child: PopupMenuButton<String>(
           tooltip: 'Menu',
           offset: const Offset(0, 48),
-          // ▼▼▼ UPDATED NAVIGATION LOGIC ▼▼▼
           onSelected: (value) {
-            // Check if user is logged in
             if (user == null) {
-              // If not logged in, show login dialog with a redirect path
-              if (value == 'register' || value == 'debtor') {
-                _openLogin(redirectTo: '/$value'); // Pass '/register' or '/debtor'
-              } else if (value == 'home') {
+              if (value == 'home') {
                 Navigator.pushNamedAndRemoveUntil(
                     context, '/home', (r) => false);
+              } else {
+                // If trying to access protected pages, prompt Staff Login dialog
+                _openLogin(redirectTo: '/$value');
               }
             } else {
-              // If logged in, navigate directly
               if (value == 'home') {
                 Navigator.pushNamedAndRemoveUntil(
                     context, '/home', (r) => false);
               } else if (value == 'register') {
                 Navigator.pushNamed(context, '/register');
+              } else if (value == 'view_status') {
+                Navigator.pushNamed(context, '/view_status');
               } else if (value == 'debtor') {
-                // Assuming '/debtor' is a named route in your MaterialApp
                 Navigator.pushNamed(context, '/debtor');
+              } else if (value == 'create_user') {
+                Navigator.pushNamed(context, '/create_user');
               }
             }
           },
-          // ▲▲▲ UPDATED NAVIGATION LOGIC ▲▲▲
           itemBuilder: (context) => const [
             PopupMenuItem(
-              value: 'home',
-              child: ListTile(
-                leading: Icon(Icons.home),
-                title: Text('Home'),
-              ),
-            ),
+                value: 'home',
+                child:
+                    ListTile(leading: Icon(Icons.home), title: Text('Home'))),
             PopupMenuItem(
-              value: 'register',
-              child: ListTile(
-                leading: Icon(Icons.app_registration),
-                title: Text('Register'),
-              ),
-            ),
+                value: 'register',
+                child: ListTile(
+                    leading: Icon(Icons.app_registration),
+                    title: Text('Register'))),
             PopupMenuItem(
-              value: 'debtor',
-              child: ListTile(
-                leading: Icon(Icons.payment),
-                title: Text('Pay Debtor'),
-              ),
-            ),
+                value: 'view_status',
+                child: ListTile(
+                    leading: Icon(Icons.visibility),
+                    title: Text('View Status'))),
+            PopupMenuItem(
+                value: 'debtor',
+                child: ListTile(
+                    leading: Icon(Icons.payment), title: Text('Pay Debtor'))),
+            PopupMenuItem(
+                value: 'create_user',
+                child: ListTile(
+                    leading: Icon(Icons.person_add),
+                    title: Text('Create User'))),
           ],
           child: Container(
             decoration: BoxDecoration(
@@ -155,41 +153,82 @@ class _CustomAppBarState extends State<CustomAppBar> {
         child: const Text(
           "– Inc.",
           style: TextStyle(
-            fontWeight: FontWeight.w900,
-            fontSize: 20,
-            color: Colors.white,
-          ),
+              fontWeight: FontWeight.w900, fontSize: 20, color: Colors.white),
         ),
       ),
-      centerTitle: false,
       actions: [
         TextButton(
-          onPressed: () {},
-          child: const Text("Solutions", style: TextStyle(color: Colors.white)),
-        ),
+            onPressed: () {},
+            child:
+                const Text("Solutions", style: TextStyle(color: Colors.white))),
         TextButton(
-          onPressed: () {},
-          child: const Text("About", style: TextStyle(color: Colors.white)),
-        ),
+            onPressed: () {},
+            child: const Text("About", style: TextStyle(color: Colors.white))),
         const SizedBox(width: 12),
+
+        // ▼▼▼ LOGIN LOGIC ▼▼▼
         if (user == null)
-          ElevatedButton(
-            onPressed: _openLogin,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: Colors.black,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(30)),
+          Theme(
+            data: Theme.of(context).copyWith(
+              popupMenuTheme: const PopupMenuThemeData(color: Colors.white),
             ),
-            child: Row(
-              children: const [
-                Text("Sign In"),
-                SizedBox(width: 5),
-                Icon(Icons.arrow_forward, size: 16)
+            child: PopupMenuButton<String>(
+              offset: const Offset(0, 48),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              onSelected: (value) {
+                if (value == 'staff_login') {
+                  // Option 1: Staff -> Opens Dialog (Pop-up)
+                  _openLogin();
+                } else if (value == 'user_login') {
+                  // Option 2: User -> Opens Full Page (No Pop-up)
+                  Navigator.pushNamed(context, '/debtor_sign_in');
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'staff_login',
+                  child: ListTile(
+                    leading:
+                        Icon(Icons.admin_panel_settings, color: Colors.black87),
+                    title: Text(
+                      'Sign In (Staff)',
+                      style: TextStyle(color: Colors.black), // Added style here
+                    ),
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'user_login',
+                  child: ListTile(
+                    leading: Icon(Icons.person, color: Colors.black87),
+                    title: Text(
+                      'User Sign In',
+                      style: TextStyle(color: Colors.black), // Added style here
+                    ),
+                  ),
+                ),
               ],
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: Row(
+                  children: const [
+                    Text("Sign In",
+                        style: TextStyle(
+                            color: Colors.black, fontWeight: FontWeight.bold)),
+                    SizedBox(width: 5),
+                    Icon(Icons.arrow_drop_down, color: Colors.black, size: 20)
+                  ],
+                ),
+              ),
             ),
           )
         else
+          // User is already logged in (Staff/Admin)
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: PopupMenuButton<String>(
@@ -202,20 +241,17 @@ class _CustomAppBarState extends State<CustomAppBar> {
                     value: "role",
                     enabled: false,
                     child: Text(
-                        "Role: ${role![0].toUpperCase()}${role!.substring(1)}"), // Capitalized role
+                        "Role: ${role![0].toUpperCase()}${role!.substring(1)}"),
                   ),
                 const PopupMenuDivider(),
                 const PopupMenuItem<String>(
-                  value: "logout",
-                  child: Text("Logout"),
-                ),
+                    value: "logout", child: Text("Logout")),
               ],
               child: Row(
                 children: [
-                  Text(
-                    username ?? user!.email ?? "User",
-                    style: const TextStyle(color: Colors.white, fontSize: 16),
-                  ),
+                  Text(username ?? user!.email ?? "User",
+                      style:
+                          const TextStyle(color: Colors.white, fontSize: 16)),
                   const Icon(Icons.arrow_drop_down, color: Colors.white),
                 ],
               ),

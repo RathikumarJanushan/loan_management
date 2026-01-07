@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:loan_management/Debtor/Debtor_Sign_in.dart';
 import 'package:loan_management/user/Debtor.dart';
+import 'package:loan_management/user/create_user.dart';
+import 'package:loan_management/user/view_status.dart';
 import 'auth_wrapper.dart'; // <-- Import the new wrapper
 import 'firebase_options.dart';
 import 'user/home.dart';
@@ -31,6 +34,11 @@ class MyApp extends StatelessWidget {
         '/home': (_) => const HomePage(),
         '/register': (_) => const RegistrationPage(),
         '/debtor': (context) => const DebtorPage(),
+        // In your main.dart routes:
+        '/create_user': (context) => const CreateUserPage(),
+        // In main.dart routes:
+        '/view_status': (context) => const ViewStatusPage(),
+        '/debtor_sign_in': (context) => const DebtorSignInPage(),
       },
     );
   }
