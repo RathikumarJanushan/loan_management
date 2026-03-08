@@ -14,6 +14,8 @@ class CreateUserPage extends StatefulWidget {
 class _CreateUserPageState extends State<CreateUserPage> {
   String? _selectedDocId;
   final _passwordController = TextEditingController();
+  final _confirmPasswordController =
+      TextEditingController(); // Added confirm controller
   bool _isLoading = false;
   bool _obscureText = true;
 
@@ -31,7 +33,8 @@ class _CreateUserPageState extends State<CreateUserPage> {
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: Color(0xFF7FD0D0), width: 2),
         ),
-        suffixIcon: label == 'Password'
+        // Updated to show visibility icon for both password fields
+        suffixIcon: label.contains('Password')
             ? IconButton(
                 icon: Icon(
                   _obscureText ? Icons.visibility_off : Icons.visibility,
@@ -50,13 +53,26 @@ class _CreateUserPageState extends State<CreateUserPage> {
   }
 
   Future<void> _updatePassword() async {
-    if (_selectedDocId == null || _passwordController.text.trim().isEmpty)
+    final password = _passwordController.text.trim();
+    final confirmPassword = _confirmPasswordController.text.trim();
+
+    if (_selectedDocId == null || password.isEmpty) return;
+
+    // Validation: Check if passwords match
+    if (password != confirmPassword) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Passwords do not match!'),
+          backgroundColor: Colors.orangeAccent,
+        ),
+      );
       return;
+    }
 
     setState(() => _isLoading = true);
 
     try {
-      final hashedPassword = _hashPassword(_passwordController.text.trim());
+      final hashedPassword = _hashPassword(password);
 
       await FirebaseFirestore.instance
           .collection('userloneregister')
@@ -77,6 +93,8 @@ class _CreateUserPageState extends State<CreateUserPage> {
         setState(() {
           _selectedDocId = null;
           _passwordController.clear();
+          _confirmPasswordController
+              .clear(); // Clear confirm password field too
         });
       }
     } catch (e) {
@@ -88,6 +106,13 @@ class _CreateUserPageState extends State<CreateUserPage> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  @override
+  void dispose() {
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
   }
 
   @override
@@ -177,7 +202,7 @@ class _CreateUserPageState extends State<CreateUserPage> {
                         },
                       ),
 
-                      // PASSWORD INPUT (Only shows if user is selected)
+                      // PASSWORD INPUTS (Only shows if user is selected)
                       if (_selectedDocId != null) ...[
                         const SizedBox(height: 16),
                         TextField(
@@ -185,6 +210,14 @@ class _CreateUserPageState extends State<CreateUserPage> {
                           obscureText: _obscureText,
                           style: const TextStyle(color: Colors.white),
                           decoration: _dec('Password'),
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: _confirmPasswordController,
+                          obscureText:
+                              _obscureText, // Using the same obscure toggle for simplicity
+                          style: const TextStyle(color: Colors.white),
+                          decoration: _dec('Confirm Password'),
                         ),
                         const SizedBox(height: 24),
                         SizedBox(

@@ -370,12 +370,12 @@ class _AdminHomePageState extends State<AdminHomePage> {
   Widget _buildChartsView() {
     final sortedMonths = _monthlySummaries.keys.toList()..sort();
     final List<Color> chartColors1 = [
-      Colors.cyan.shade300,
+      const Color.fromARGB(255, 41, 240, 1),
       Colors.cyan.shade600
     ];
     final List<Color> chartColors2 = [
       Colors.teal.shade300,
-      Colors.teal.shade600
+      const Color.fromARGB(255, 221, 4, 4)
     ];
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),

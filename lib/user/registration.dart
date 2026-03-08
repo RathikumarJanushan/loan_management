@@ -19,7 +19,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
   final _formKey = GlobalKey<FormState>();
 
   // TODO: Replace with your actual Gemini API Key
-  static const String _apiKey = 'AIzaSyBqOz61PLMxLEIgt8YIuUGYzwVx7CWNQBo';
+  static const String _apiKey = 'AIzaSyArIWeMbhxUFi1oVShSwi0RsAKvKFlROLc';
 
   // controllers
   final _name = TextEditingController();
